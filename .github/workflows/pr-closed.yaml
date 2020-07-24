@@ -1,0 +1,36 @@
+name: Pull Request Closed
+
+on:
+  pull_request:
+    types: [closed]
+
+env:
+  resourceGroup: ado30jd
+  nameSpace: twt
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Retrieving info..."
+        run: |
+          # set for this step
+          AKS_CLUSTER=$(az aks list --resource-group $resourceGroup --query [0].name -o tsv)
+          echo "::set-env name=AKS_CLUSTER::$(az aks list --resource-group $resourceGroup --query [0].name -o tsv)"
+
+      - name: Create valid release-name
+        id: generate-release-name
+        run: |
+          release=cart-$GITHUB_HEAD_REF
+          release=${release::53}
+          release=$(echo ${release//[!0-9a-zA-Z]/-} | tr '[:upper:]' '[:lower:]' | sed -e 's/^-/z/' -e 's/-$/z/')
+          echo ::set-output name=result::$release
+
+      - uses: azure/aks-set-context@v1
+        with:
+          creds: "${{ secrets.AZURE_CREDENTIALS }}"
+          cluster-name: ${{ env.AKS_CLUSTER }}
+          resource-group: ${{ env.resourceGroup }}
+
+      - name: Remove Isolated Version
+        run: helm uninstall ${{steps.generate-release-name.outputs.result}}
