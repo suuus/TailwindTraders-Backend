@@ -38,4 +38,4 @@ jobs:
           resource-group: ${{ env.resourceGroup }}
 
       - name: Remove Isolated Version
-        run: helm uninstall ${{steps.generate-release-name.outputs.result}}
+        run: helm uninstall -n ${{ env.nameSpace }} ${{steps.generate-release-name.outputs.result}}
