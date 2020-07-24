@@ -11,8 +11,10 @@ env:
   # azure
   resourceGroup: ado30jd
 
-  # path prefix
+  # helmchart
   tailwindChartValuesScript: Deploy/helm-values/generate-config.ps1
+  tailwindChartValues: values.yaml
+  tailwindCharts: Deploy/helm
 
 jobs:
   build:
@@ -28,7 +30,8 @@ jobs:
 
       - name: "Create Helm gvalues file"
         run: |
-          pwsh $tailwindChartValuesScript -resourceGroup $resourceGroup -outputFile values.yaml
+          az extension add --name application-insights
+          pwsh $tailwindChartValuesScript -resourceGroup $resourceGroup -outputFile $tailwindChartValues
 
       - name: "Set PR Environment"
         run: |
@@ -66,7 +69,7 @@ jobs:
         with:
           creds: "${{ secrets.AZURE_CREDENTIALS }}"
           cluster-name: ${{ env.AKS_CLUSTER }}
-          resource-group: $resourceGroup
+          resource-group: ${{ env.resourceGroup }}
 
       - name: Create valid branch name
         id: generate-valid-branch-name
@@ -93,18 +96,27 @@ jobs:
 
       - name: Helm Install PR
         run: |
-          cd Deploy/helm
           helm upgrade --install --namespace  ${{ secrets.MASTER_SPACE }} ${{steps.generate-release-name.outputs.result}} \
-            -f $tailwindChartValues --set ingress.hosts={$INGRESS} --set image.repository=$CONTAINER_REGISTRY/cart.api --set image.tag=$GITHUB_SHA $tailwindCharts/cart-api --set B2C.clientID=none --set B2C.identityMetadata=none --set B2C.issuer=none --set B2C.policyName=none --set B2C.tenantID=none
+          -f $tailwindChartValues \
+          --set ingress.hosts={$INGRESS} \
+          --set image.repository=$CONTAINER_REGISTRY/cart.api \
+          --set image.tag=$GITHUB_SHA $tailwindCharts/cart-api \
+          --set B2C.clientID=none \
+          --set B2C.identityMetadata=none \
+          --set B2C.issuer=none \
+          --set B2C.policyName=none \
+          --set B2C.tenantID=none
 
       - name: Add routing labels
         run: |
-          kubectl label pods --selector="app=twt-cart,release=${{steps.generate-release-name.outputs.result}}" routing.visualstudio.io/route-from=twt-cart -n ${{ secrets.MASTER_SPACE }}
-          kubectl annotate pods --selector="app=twt-cart,release=${{steps.generate-release-name.outputs.result}}" routing.visualstudio.io/route-on-header=kubernetes-route-as=${{steps.generate-valid-branch-name.outputs.result}} -n ${{ secrets.MASTER_SPACE }}
+          kubectl label pods --selector="app=tailwindtraders-cart,release=${{steps.generate-release-name.outputs.result}}" routing.visualstudio.io/route-from=tailwindtraders-cart -n ${{ secrets.MASTER_SPACE }} --overwrite=true
 
-      - uses: azure/dev-spaces/actions/add-review-url@Releases/v2
+          #try ingress
+          kubectl annotate pods --selector="app=tailwindtraders-cart,release=${{steps.generate-release-name.outputs.result}}" routing.visualstudio.io/route-on-header=kubernetes-route-as=${{steps.generate-valid-branch-name.outputs.result}} -n ${{ secrets.MASTER_SPACE }} --overwrite=true
+
+      - uses: jldeen/dev-spaces/actions/add-review-url@Releases/v2
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          host: ${INGRESS}
-          child-space: ${{steps.generate-valid-branch-name.outputs.result}}
+          host: "${{ env.INGRESS }}"
+          branch-name: ${{steps.generate-valid-branch-name.outputs.result}}
           protocol: "http"
