@@ -37,5 +37,5 @@ jobs:
           cluster-name: ${{ env.AKS_CLUSTER }}
           resource-group: ${{ env.resourceGroup }}
 
-      - name: Remove Isolated Version
+      - name: Cleanup pr version
         run: helm uninstall -n ${{ env.nameSpace }} ${{steps.generate-release-name.outputs.result}}
