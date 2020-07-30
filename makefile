@@ -4,6 +4,9 @@ USEREMAIL ?= jedeen@outlook.com
 
 .PHONY: clean
 
+clean-demo2:
+	-make git-clean-demo2
+
 clean:
 	-make git-clean
 
@@ -19,4 +22,13 @@ git-clean:
 	-git fetch --prune
 	-git checkout -b $(BRANCH) origin/main
 	-git push --set-upstream origin $(BRANCH)
+
+git-clean-demo2: 
+	-git checkout main
+	-git pull
+	-git branch -d security-fix
+	-git push origin -d security-fix && echo "security-fix successfully deleted"
+	-git fetch --prune
+	-git checkout -b security-fix origin/main
+	-git push --set-upstream origin security-fix
 	
