@@ -1,4 +1,4 @@
-name: Build/Push ImageClassifier api
+name: PRFlow Image Classifier API
 
 on:
   pull_request:

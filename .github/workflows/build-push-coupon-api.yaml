@@ -1,4 +1,4 @@
-name: Build/Push Coupon api
+name: PRFlow Coupon API
 
 on:
   pull_request:
