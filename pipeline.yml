@@ -67,22 +67,36 @@ pipelines:
             - name: dockerPush 
         execution:
           onExecute:
-            - branch=${GITHUB_HEAD_REF::63}
+            - branch=$res_GitHub_headCommitRef
+            - echo $branch
+            - printenv | grep res_GitHub_
             - branch=$(echo ${branch//[!0-9a-zA-Z]/-} | tr '[:upper:]' '[:lower:]' | sed -e 's/^-/z/' -e 's/-$/z/')
-            - add_run_variables result="$branch"
+            - add_run_variables result="jfrog-pipelines"
       
       - name: setPREnvironment
         type: bash
         configuration:
           affinityGroup: cartapi
+          runtime:
+            type: image
+            image:
+              custom:
+                name: jldeen.jfrog.io/images/pwsh
+                tag: "2"
+                registry: Artifactory
+                sourceRepository: images
           inputResources:
             - name: GitHub
           inputSteps:
-            - name: createValidBranchName 
+            - name: createValidBranchName
+          integrations:
+            - name: Azure
         execution:
           onExecute:
-            - ingress="5e6d13db1926415ea94e.eastus.aksapp.io"
-            - add_run_variables INGRESS=$ingress
+            - cd $res_GitHub_resourcePath
+            - AKS_CLUSTER=$(az aks list --resource-group $resourceGroup --query [0].name -o tsv)
+            - INGRESS=$(az aks show -n $AKS_CLUSTER -g $resourceGroup --query addonProfiles.httpApplicationRouting.config.HTTPApplicationRoutingZoneName -o tsv)
+            - add_run_variables INGRESS=$INGRESS
         
       - name: createHelmGlobalValues
         type: bash
@@ -106,8 +120,6 @@ pipelines:
           onExecute:
             - cd $res_GitHub_resourcePath
             - pwsh $tailwindChartValuesScript -resourceGroup $resourceGroup -outputFile $tailwindChartValues
-            - ls -la
-            - ls -la $res_GitHub_resourcePath/
             - add_run_files $tailwindChartValues values
       
       - name: helmPRInstall
@@ -115,9 +127,16 @@ pipelines:
         configuration:
           #inherits from bash
           helmVersion: 3
-          releaseName: $result
-          chartPath: $tailwindCharts/cart-api
-          flags: --set ingress.hosts=$INGRESS,image.repository=jldeen.jfrog.io/images/cart.api,image.tag=${run_number},B2C.clientID=none,B2C.identityMetadata=none,B2C.issuer=none,B2C.policyName=none,B2C.tenantID=none -f $tailwindChartValues
+          runtime:
+            type: image
+            image:
+              auto:
+                language: node
+                versions:
+                  - "12.18.2"
+          releaseName: ${result}
+          chartPath: ./${tailwindCharts}/cart-api
+          flags: "--namespace twt -f $res_GitHub_resourcePath/$tailwindChartValues --set ingress.hosts={$INGRESS} --set image.repository=jldeen.jfrog.io/images/cart.api --set imagePullSecrets.name=$result --set image.tag=${run_number} --set B2C.clientID=none --set B2C.identityMetadata=none --set B2C.issuer=none --set B2C.policyName=none --set B2C.tenantID=none"
           affinityGroup: cartapi
           inputResources:
             - name: GitHub
@@ -125,9 +144,13 @@ pipelines:
             - name: createHelmGlobalValues
           integrations:
             - name: AKS
+            - name: Artifactory
         execution:
           onStart:
             - restore_run_files values $res_GitHub_resourcePath/$tailwindChartValues
+            - secretCheck=$(kubectl get secrets -n $nameSpace --field-selector type=kubernetes.io/dockerconfigjson | grep "$result" || true)
+            - if [[ $secretCheck ]]; then echo "$result k8s secret already exists!"; else kubectl create secret docker-registry $result -n $nameSpace --docker-server=int_Artifactory_url --docker-username=int_Artifactory_user --docker-password=int_Artifactory_apikey && echo "$result k8s secret created!"; fi
+
 
       - name: addRoutingLabels
         type: bash
@@ -137,27 +160,29 @@ pipelines:
             - name: GitHub
           inputSteps:
             - name: helmPRInstall
+          integrations:
+            - name: AKS
         execution:
           onExecute:
           - kubectl label pods --selector="app=tailwindtraders-cart,release=$result" routing.visualstudio.io/route-from=$result-tailwindtraders-cart -n $nameSpace --overwrite=true
           - kubectl annotate pods --selector="app=tailwindtraders-cart,release=$result" routing.visualstudio.io/route-on-header=kubernetes-route-as=$result -n $nameSpace --overwrite=true
       
-      - name: addGitHubFQDN
-        type: bash
-        configuration:
-          affinityGroup: cartapi
-          inputResources:
-            - name: GitHub
-          inputSteps:
-            - name: addRoutingLabels
-          environmentVariables:
-            GITHUB_TOKEN: $res_GitHub_gitProvider_token
-            GITHUB_OWNER: jldeen
-            GITHUB_REPO: TailwindTraders-Backend
-            GITHUB_COMMENT_TYPE: pr
-            GITHUB_PR_ISSUE_NUMBER: $res_GitHub_pullRequestNumber
-        execution:
-          onExecute:
-            - wget https://github.com/cloudposse/github-commenter/releases/download/0.8.0/github-commenter_linux_amd64 -o github-commenter
-            - chmod +x github-commenter
-            - $result.$INGRESS 2>&1 | github-commenter -format "You can see a private version of the changes made in this pull request here `$result.$ingress`<br/>```{{.}}```"
+      # - name: addGitHubFQDN
+      #   type: bash
+      #   configuration:
+      #     affinityGroup: cartapi
+      #     inputResources:
+      #       - name: GitHub
+      #     inputSteps:
+      #       - name: addRoutingLabels
+      #     environmentVariables:
+      #       GITHUB_TOKEN: ${res_GitHub_gitProvider_token}
+      #       GITHUB_OWNER: jldeen
+      #       GITHUB_REPO: TailwindTraders-Backend
+      #       GITHUB_COMMENT_TYPE: pr
+      #       GITHUB_PR_ISSUE_NUMBER: ${res_GitHub_pullRequestNumber}
+      #   execution:
+      #     onExecute:
+      #       - wget https://github.com/cloudposse/github-commenter/releases/download/0.8.0/github-commenter_linux_amd64 -o github-commenter
+      #       - chmod +x github-commenter
+      #       - $result.$INGRESS 2>&1 | github-commenter -format "You can see a private version of the changes made in this pull request here `$result.$ingress`<br/>```{{.}}```"
