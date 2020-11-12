@@ -184,5 +184,5 @@ pipelines:
             GITHUB_COMMENT: "You can see a private version of the changes made in this pull request here "
         execution:
           onExecute: 
-            - docker run -i --rm -e GITHUB_TOKEN -e GITHUB_OWNER -e GITHUB_REPO -e GITHUB_COMMENT_TYPE -e GITHUB_PR_ISSUE_NUMBER -e GITHUB_COMMENT cloudposse/github-commenter -comment "You can see a private version of the changes made in this pull request  here - '${result}.${ingress}'"
+            - docker run -i --rm -e GITHUB_TOKEN -e GITHUB_OWNER -e GITHUB_REPO -e GITHUB_COMMENT_TYPE -e GITHUB_PR_ISSUE_NUMBER -e GITHUB_COMMENT cloudposse/github-commenter -comment "You can see a private version of the changes made in this pull request  here - ${result}.{$INGRESS}"
 
