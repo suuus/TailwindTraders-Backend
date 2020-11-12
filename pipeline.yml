@@ -171,12 +171,6 @@ pipelines:
         type: bash
         configuration:
           affinityGroup: cartapi
-          runtime:
-            type: image
-            image:
-              custom:
-                name: cloudposse/github-commenter
-                tag: "latest"
           inputResources:
             - name: GitHub
           inputSteps:
@@ -187,7 +181,15 @@ pipelines:
             GITHUB_REPO: TailwindTraders-Backend
             GITHUB_COMMENT_TYPE: pr
             GITHUB_PR_ISSUE_NUMBER: ${res_GitHub_pullRequestNumber}
+            GITHUB_COMMENT: "You can see a private version of the changes made in this pull request here `${result}.${ingress}`"
         execution:
           onExecute: 
-            - -comment "You can see a private version of the changes made in this pull request here `${result}.${ingress}`"
+            - docker run -i --rm \
+                -e GITHUB_TOKEN \
+                -e GITHUB_OWNER \
+                -e GITHUB_REPO \
+                -e GITHUB_COMMENT_TYPE \
+                -e GITHUB_PR_ISSUE_NUMBER \
+                -e GITHUB_COMMENT \
+                cloudposse/github-commenter
 
