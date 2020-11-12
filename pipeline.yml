@@ -187,7 +187,7 @@ pipelines:
             GITHUB_REPO: TailwindTraders-Backend
             GITHUB_COMMENT_TYPE: pr
             GITHUB_PR_ISSUE_NUMBER: ${res_GitHub_pullRequestNumber}
-            GITHUB_COMMENT: "You can see a private version of the changes made in this pull request here: `${result}.${ingress}`"
+            GITHUB_COMMENT: "You can see a private version of the changes made in this pull request here `${result}.${ingress}`"
         execution:
           onStart: 
             - echo "Adding FQDN to PR now..."
