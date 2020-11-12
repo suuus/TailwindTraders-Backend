@@ -189,5 +189,6 @@ pipelines:
             GITHUB_PR_ISSUE_NUMBER: ${res_GitHub_pullRequestNumber}
             GITHUB_COMMENT: "You can see a private version of the changes made in this pull request here: `${result}.${ingress}`"
         execution:
-          onStart: echo "Adding FQDN to PR now..."
+          onStart: 
+            - echo "Adding FQDN to PR now..."
 
