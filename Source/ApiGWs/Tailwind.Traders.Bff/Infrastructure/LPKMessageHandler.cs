@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -7,17 +8,20 @@ using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.OpenApi.Models;
+using Microsoft.IdentityModel.Logging;
+using Microsoft.IdentityModel.Tokens;
 using RegistrationUserService;
 using System;
 using System.ServiceModel;
-using Tailwind.Traders.MobileBff;
-using Tailwind.Traders.MobileBff.Extensions;
-using Tailwind.Traders.MobileBff.Infrastructure;
-using Tailwind.Traders.MobileBff.Services;
+using System.Text;
+using System.Threading;
+using Tailwind.Traders.WebBff.Extensions;
+using Tailwind.Traders.WebBff.Helpers;
+using Tailwind.Traders.WebBff.Infrastructure;
+using Tailwind.Traders.WebBff.Services;
 using static RegistrationUserService.UserServiceClient;
 
-namespace Tailwind.Traders.Bff
+namespace Tailwind.Traders.WebBff
 {
     public class Startup
     {
@@ -32,10 +36,7 @@ namespace Tailwind.Traders.Bff
         // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
         {
-            services
-                .AddHttpClientServices(Configuration)
-                .AddHealthChecks(Configuration);
-
+            services.AddHttpClientServices();
             services.Configure<AppSettings>(Configuration);
             services.AddTransient<IUserService>(_ => new UserServiceClient(
                 EndpointConfiguration.BasicHttpBinding_IUserService,
@@ -43,15 +44,7 @@ namespace Tailwind.Traders.Bff
 
             services.AddTransient<IRegisterService, RegisterService>();
 
-            services.AddSwaggerGen(options =>
-            {
-                options.SwaggerDoc("v1", new OpenApiInfo
-                {
-                    Title = "Tailwind Traders - Mobile BFF HTTP API",
-                    Version = "v1"
-                });
-            });
-
+            services.AddSwagger();
             services.AddApiVersioning(options =>
             {
                 options.ReportApiVersions = true;
@@ -59,23 +52,55 @@ namespace Tailwind.Traders.Bff
                 options.ApiVersionReader = new QueryStringApiVersionReader();
             });
 
+            var appInsightsIK = Configuration["ApplicationInsights:InstrumentationKey"];
+
+            if (!string.IsNullOrEmpty(appInsightsIK))
+            {
+                services.AddApplicationInsightsTelemetry(appInsightsIK);
+            }
+
             services.AddControllers()
-                .SetCompatibilityVersion(CompatibilityVersion.Latest);
+                            .SetCompatibilityVersion(CompatibilityVersion.Latest)
+                            .AddNewtonsoftJson()
+                            .Services
+                            .AddHealthChecks(Configuration)
+                            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                            .AddJwtBearer(options =>
+                            {
+                                if (UseBc2.GetUseB2CBoolean(Configuration))
+                                {
+                                    options.Authority = Configuration["Authority"];
+                                    options.TokenValidationParameters.ValidateAudience = false;
+                                    options.RequireHttpsMetadata = false;
+                                }
+                                else
+                                {
+                                    options.TokenValidationParameters = new TokenValidationParameters
+                                    {
+                                        ValidateIssuer = true,
+                                        ValidateAudience = false,
+                                        ValidIssuer = Configuration["Issuer"],
+                                        ValidateLifetime = true,
+                                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["SecurityKey"]))
+                                    };
+                                }
+                            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-            }
-
             var swaggerEndpoint = "/swagger/v1/swagger.json";
 
             if (!string.IsNullOrEmpty(Configuration["gwPath"]))
             {
                 swaggerEndpoint = $"/{Configuration["gwPath"]}{swaggerEndpoint}";
+            }
+
+            if (env.IsDevelopment())
+            {
+                IdentityModelEventSource.ShowPII = true;
+                app.UseDeveloperExceptionPage();
             }
 
             app.UseCors(builder =>
@@ -87,14 +112,13 @@ namespace Tailwind.Traders.Bff
             });
 
             app.UseRouting();
-
             app.UseAuthentication();
             app.UseAuthorization();
-
             app.UseSwagger();
+
             app.UseSwaggerUI(c =>
             {
-                c.SwaggerEndpoint(swaggerEndpoint, "MobileBFF V1");
+                c.SwaggerEndpoint(swaggerEndpoint, "WebBFF V1");
                 c.RoutePrefix = string.Empty;
             });
 
@@ -110,7 +134,7 @@ namespace Tailwind.Traders.Bff
 
     static class ServiceCollectionExtensions
     {
-        public static IServiceCollection AddHttpClientServices(this IServiceCollection services, IConfiguration configuration)
+        public static IServiceCollection AddHttpClientServices(this IServiceCollection services)
         {
             services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 
@@ -118,8 +142,8 @@ namespace Tailwind.Traders.Bff
             services.AddTransient<HttpClientAuthorizationDelegatingHandler>();
             services.AddTransient<LPKMessageHandler>();
 
-            //set 5 min as the lifetime for each HttpMessageHandler int the pool
-            services.AddHttpClient("extendedhandlerlifetime").SetHandlerLifetime(TimeSpan.FromMinutes(5));
+            //InfinteTimeSpan -> See: https://github.com/aspnet/HttpClientFactory/issues/194
+            services.AddHttpClient("extendedhandlerlifetime").SetHandlerLifetime(Timeout.InfiniteTimeSpan);
 
             //add http client services
             services.AddHttpClient(HttpClients.ApiGW)

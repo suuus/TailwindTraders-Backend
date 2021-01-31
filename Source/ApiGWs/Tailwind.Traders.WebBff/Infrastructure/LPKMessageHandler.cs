@@ -8,10 +8,10 @@ using System.Threading.Tasks;
 
 namespace Tailwind.Traders.WebBff.Infrastructure
 {
-    public class Bridge2K8sMessageHandler : DelegatingHandler
+    public class LPKMessageHandler : DelegatingHandler
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
-        public Bridge2K8sMessageHandler(IHttpContextAccessor httpContextAccessor)
+        public LPKMessageHandler(IHttpContextAccessor httpContextAccessor)
         {
             _httpContextAccessor = httpContextAccessor;
         }
