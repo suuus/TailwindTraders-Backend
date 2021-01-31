@@ -75,7 +75,7 @@ if ($appInsightsName -and $appInsightsName.Length -eq 1) {
         $appinsightsId = $appinsightsConfig.instrumentationKey           
     }
 }
-Write-Host "App Insights Instrumentation Key: $($appinsightsId)" -ForegroundColor Yellow
+Write-Host "App Insights Instrumentation Key: $appinsightsId" -ForegroundColor Yellow
 
 ## Showing Values that will be used
 
@@ -100,7 +100,7 @@ $tokens.seckey="nEpLzQJGNSCNL5H6DIQCtTdNxf5VgAGcBbtXLms1YDD01KJBAs0WVawaEjn97uwB
 $tokens.ingressrewritepath=""
 $tokens.ingressrewritetarget=""
 
-if($ingressClass -ne "addon-http-application-routing") {
+if($ingressClass -eq "nginx") {
     $tokens.ingressrewritepath="(/|$)(.*)" 
     $tokens.ingressrewritetarget="`$2"
 }
