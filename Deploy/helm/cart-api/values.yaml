@@ -6,9 +6,6 @@ image:
   tag: prod
   pullPolicy: Always
 
-imagePullSecrets:
-  name: twt
-
 service:
   type: ClusterIP
   port: 80
