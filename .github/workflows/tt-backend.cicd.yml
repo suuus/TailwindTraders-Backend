@@ -5,7 +5,7 @@ on:
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [main]
-#  schedule:
+  workflow_dispatch:
 #    - cron: '0 0 * * *'
 
 jobs:
@@ -33,7 +33,7 @@ jobs:
       run: |
         docker-compose build --no-cache 
         
-  nightly-build-and-deploy:
+  workflow_dispatch:
     if: ${{ github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     steps:
