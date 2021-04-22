@@ -102,7 +102,7 @@ jobs:
       working-directory: Deploy/powershell
       shell: pwsh
       run: |
-        ./Deploy-Images-Aks.ps1 -aksName ${{ secrets.AKS_NAME }} -resourceGroup ${{ secrets.RESOURCE_GROUP }} -acrName ${{ secrets.ACR_NAME }} -valuesFile ${{ env.GVALUES_LOCATION }} -tlsHost ${{ secrets.TLS_HOST }} -tlsEnv ${{ secrets.TLS_ENV }}
+        ./Deploy-Images-Aks.ps1 -aksName ${{ secrets.AKS_NAME }} -resourceGroup ${{ secrets.RESOURCE_GROUP }} -acrName ${{ secrets.ACR_NAME }} -valuesFile ${{ env.GVALUES_LOCATION }} 
     
     - name: Deploy pictures
       working-directory: Deploy/powershell
